@@ -300,6 +300,8 @@ pub fn SDL_keysym_to_gui(keysym: i32) gui.enums.Key {
         c.SDLK_RIGHT => .right,
         c.SDLK_TAB => .tab,
         c.SDLK_ESCAPE => .escape,
+        c.SDLK_RETURN, c.SDLK_KP_ENTER => .enter,
+        c.SDLK_SEMICOLON => .semicolon,
         else => .unknown,
     };
 }

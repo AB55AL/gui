@@ -416,7 +416,7 @@ pub fn flushRender(self: *MachBackend) void {
     defer arena_allocator.deinit();
 
     var vertices = arena.alloc(Vertex, self.vtx.items.len) catch unreachable;
-    for (self.vtx.items) |vin, i| {
+    for (self.vtx.items, 0..) |vin, i| {
         vertices[i] = Vertex{ .pos = vin.pos, .col = .{ @intToFloat(f32, vin.col.r) / 255.0, @intToFloat(f32, vin.col.g) / 255.0, @intToFloat(f32, vin.col.b) / 255.0, @intToFloat(f32, vin.col.a) / 255.0 }, .uv = vin.uv };
     }
     //std.debug.print("vertexes {d} + {d} indexes {d} + {d}\n", .{self.vertex_buffer_len, self.vtx.items.len, self.index_buffer_len, self.idx.items.len});

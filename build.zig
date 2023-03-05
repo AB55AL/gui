@@ -1,5 +1,6 @@
 const std = @import("std");
-const Pkg = std.build.Pkg;
+// const Pkg = std.build.Pkg;
+const Module = std.build.Module;
 const Builder = @import("std").build.Builder;
 const freetype = @import("libs/mach/libs/freetype/build.zig");
 
@@ -9,12 +10,19 @@ const libcurl = @import("libs/zig-libcurl/libcurl.zig");
 const libzlib = @import("libs/zig-zlib/zlib.zig");
 const libxml2 = @import("libs/zig-libxml2/libxml2.zig");
 
-const Packages = struct {
+// const tvg = @import("libs/tinyvg/src/lib/tinyvg.zig");
+
+const modules = struct {
     // Declared here because submodule may not be cloned at the time build.zig runs.
-    const zmath = std.build.Pkg{
-        .name = "zmath",
-        .source = .{ .path = "libs/zmath/src/zmath.zig" },
-    };
+    // const zmath = std.build.Pkg{
+    //     .name = "zmath",
+    //     .source = .{ .path = "libs/zmath/src/zmath.zig" },
+    // };
+    fn zmathModule(b: *Builder) *Module {
+        return b.createModule(.{
+            .source_file = .{ .path = "libs/zmath/src/zmath.zig" },
+        });
+    }
 };
 
 pub fn build(b: *Builder) !void {
@@ -26,22 +34,24 @@ pub fn build(b: *Builder) !void {
 
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    // const mode = b.standardReleaseOptions();
+    const mode = std.builtin.Mode.Debug;
 
     // mach example
     {
         const name = "mach-test";
-        const mach = @import("libs/mach/build.zig");
-        const example_app = try mach.App.init(
+        const mach_build = @import("libs/mach/build.zig");
+        const example_app = try mach_build.App.init(
             b,
             .{
                 .name = "mach-test",
                 .src = "mach-test.zig",
                 .target = target,
-                .deps = &[_]Pkg{ Packages.zmath, freetype.pkg },
+                .deps = &[_]std.build.ModuleDependency{ .{ .name = "zmath", .module = modules.zmathModule(b) }, .{ .name = "freetype", .module = freetype.module(b) } },
+                .optimize = mode,
             },
         );
-        example_app.setBuildMode(mode);
+        // example_app.setBuildMode(mode);
         freetype.link(example_app.b, example_app.step, .{});
         try example_app.link(.{});
 
@@ -58,9 +68,13 @@ pub fn build(b: *Builder) !void {
 
     // sdl test
     {
-        const exe = b.addExecutable("sdl-test", "sdl-test" ++ ".zig");
+        const exe = b.addExecutable(.{
+            .name = "sdl-test",
+            .root_source_file = .{ .path = "sdl-test" ++ ".zig" },
+            .optimize = .Debug,
+        });
 
-        exe.addPackage(freetype.pkg);
+        exe.addModule("freetype", freetype.module(b));
         freetype.link(b, exe, .{});
 
         exe.linkSystemLibrary("SDL2");
@@ -86,8 +100,8 @@ pub fn build(b: *Builder) !void {
             exe.linkFramework("Metal");
         }
 
-        exe.setTarget(target);
-        exe.setBuildMode(mode);
+        // exe.setTarget(target);
+        // exe.setBuildMode(mode);
 
         const compile_step = b.step("compile-" ++ "sdl-test", "Compile " ++ "sdl-test");
         compile_step.dependOn(&b.addInstallArtifact(exe).step);
@@ -102,18 +116,23 @@ pub fn build(b: *Builder) !void {
 
     // podcast example application
     {
-        const exe = b.addExecutable("podcast", "podcast" ++ ".zig");
+        const exe = b.addExecutable(.{
+            .name = "podcast",
+            .root_source_file = .{ .path = "podcast" ++ ".zig" },
+            .optimize = .Debug,
+        });
         exe.linkSystemLibrary("SDL2");
 
-        exe.addPackage(freetype.pkg);
+        exe.addModule("freetype", freetype.module(b));
         freetype.link(b, exe, .{ .freetype = .{ .use_system_zlib = true } });
 
-        const sqlite = b.addStaticLibrary("sqlite", null);
+        const sqlite = b.addStaticLibrary(.{ .name = "sqlite", .target = target, .optimize = .Debug });
         sqlite.addCSourceFile("libs/zig-sqlite/c/sqlite3.c", &[_][]const u8{"-std=c99"});
         sqlite.linkLibC();
 
         exe.linkLibrary(sqlite);
-        exe.addPackagePath("sqlite", "libs/zig-sqlite/sqlite.zig");
+        exe.addModule("sqlite", b.createModule(.{ .source_file = .{ .path = "libs/zig-sqlite/sqlite.zig" } }));
+        // exe.addPackagePath("sqlite", "libs/zig-sqlite/sqlite.zig");
         exe.addIncludePath("libs/zig-sqlite/c");
 
         const tls = mbedtls.create(b, target, mode);
@@ -140,16 +159,21 @@ pub fn build(b: *Builder) !void {
         libxml.link(exe);
 
         {
-            var ffmpeg = b.addStaticLibrary("ffmpeg", null);
-            ffmpeg.setTarget(target);
-            ffmpeg.setBuildMode(mode);
-            ffmpeg.linkLibC();
-            ffmpeg.addIncludePath(root_path);
-            ffmpeg.addIncludePath(extra_include);
-            ffmpeg.addCSourceFiles(srcs, flags);
+            // const ffmpeg = b.addStaticLibrary(.{ .name = "ffmpeg", .target = target, .optimize = .Debug });
+            // // ffmpeg.setTarget(target);
+            // // ffmpeg.setBuildMode(mode);
+            // ffmpeg.linkLibC();
+            // ffmpeg.addIncludePath(root_path);
+            // ffmpeg.addIncludePath(extra_include);
+            // ffmpeg.addCSourceFiles(srcs, flags);
 
-            exe.addIncludePath(root_path);
-            exe.linkLibrary(ffmpeg);
+            // exe.addIncludePath(root_path);
+            // exe.linkLibrary(ffmpeg);
+            exe.linkSystemLibrary("avutil");
+            exe.linkSystemLibrary("swscale");
+            exe.linkSystemLibrary("swresample");
+            exe.linkSystemLibrary("avcodec");
+            exe.linkSystemLibrary("avformat");
         }
 
         if (target.isDarwin()) {
@@ -171,8 +195,8 @@ pub fn build(b: *Builder) !void {
             exe.linkFramework("Metal");
         }
 
-        exe.setTarget(target);
-        exe.setBuildMode(mode);
+        // exe.setTarget(target);
+        // exe.setBuildMode(mode);
 
         const compile_step = b.step("compile-" ++ "podcast", "Compile " ++ "podcast");
         compile_step.dependOn(&b.addInstallArtifact(exe).step);
