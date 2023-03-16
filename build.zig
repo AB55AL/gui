@@ -4,14 +4,6 @@ const Module = std.build.Module;
 const Builder = @import("std").build.Builder;
 const freetype = @import("libs/mach/libs/freetype/build.zig");
 
-const mbedtls = @import("libs/zig-mbedtls/mbedtls.zig");
-const libssh2 = @import("libs/zig-libssh2/libssh2.zig");
-const libcurl = @import("libs/zig-libcurl/libcurl.zig");
-const libzlib = @import("libs/zig-zlib/zlib.zig");
-const libxml2 = @import("libs/zig-libxml2/libxml2.zig");
-
-// const tvg = @import("libs/tinyvg/src/lib/tinyvg.zig");
-
 const modules = struct {
     // Declared here because submodule may not be cloned at the time build.zig runs.
     // const zmath = std.build.Pkg{
@@ -21,6 +13,12 @@ const modules = struct {
     fn zmathModule(b: *Builder) *Module {
         return b.createModule(.{
             .source_file = .{ .path = "libs/zmath/src/zmath.zig" },
+        });
+    }
+
+    fn tvgModule(b: *Builder) *Module {
+        return b.createModule(.{
+            .source_file = .{ .path = "libs/tinyvg/src/lib/tinyvg.zig" },
         });
     }
 };
@@ -76,6 +74,8 @@ pub fn build(b: *Builder) !void {
 
         exe.addModule("freetype", freetype.module(b));
         freetype.link(b, exe, .{});
+
+        exe.addModule("tinyvg", modules.tvgModule(b));
 
         exe.linkSystemLibrary("SDL2");
         //exe.addIncludePath("/home/dvanderson/SDL/build/include");
@@ -134,29 +134,6 @@ pub fn build(b: *Builder) !void {
         exe.addModule("sqlite", b.createModule(.{ .source_file = .{ .path = "libs/zig-sqlite/sqlite.zig" } }));
         // exe.addPackagePath("sqlite", "libs/zig-sqlite/sqlite.zig");
         exe.addIncludePath("libs/zig-sqlite/c");
-
-        const tls = mbedtls.create(b, target, mode);
-        tls.link(exe);
-
-        const ssh2 = libssh2.create(b, target, mode);
-        tls.link(ssh2.step);
-        ssh2.link(exe);
-
-        const zlib = libzlib.create(b, target, mode);
-        zlib.link(exe, .{});
-
-        const curl = try libcurl.create(b, target, mode);
-        tls.link(curl.step);
-        ssh2.link(curl.step);
-        curl.link(exe, .{ .import_name = "curl" });
-
-        const libxml = try libxml2.create(b, target, mode, .{
-            .iconv = false,
-            .lzma = false,
-            .zlib = true,
-        });
-
-        libxml.link(exe);
 
         {
             // const ffmpeg = b.addStaticLibrary(.{ .name = "ffmpeg", .target = target, .optimize = .Debug });
